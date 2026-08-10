@@ -1,0 +1,28 @@
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+	buttons {
+		compatible = "gpio-keys";
+
+		power_button: button_power {
+			gpios = <&gpio0 1 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Power button";
+		};
+
+		up_button: button_up {
+			gpios = <&gpio0 2 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Up button";
+		};
+
+		down_button: button_down {
+			gpios = <&gpio0 3 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Down button";
+		};
+	};
+
+	aliases {
+		sw0 = &power_button;
+		sw1 = &up_button;
+		sw2 = &down_button;
+	};
+};

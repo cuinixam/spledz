@@ -1,0 +1,18 @@
+pipeline:
+  install:
+    - step: CreateVEnv
+      module: pypeline.steps.create_venv
+      config:
+        python_version: "3.11"
+        python_package_manager: poetry>=2.2
+    # Installs the tools listed in poks.json (cmake, ninja, gcc).
+    - step: PoksInstall
+      module: pypeline.steps.poks_install
+    # Writes the script that puts those tools on PATH.
+    - step: GenerateEnvSetupScript
+      module: pypeline.steps.env_setup_script
+
+# Note: pypeline also ships a WestInstall step, which would create its own west
+# workspace from a west.yaml. It is deliberately not used here. The west.yml in
+# this repo is a native Zephyr manifest and the workspace is created with
+# `west init`, so the build stays the one a Zephyr team would run.

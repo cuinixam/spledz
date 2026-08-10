@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build ${{ matrix.variant }} (Linux)
+    runs-on: ubuntu-latest
+    env:
+      # native_sim runs on the host, so Zephyr uses the host compiler instead of
+      # the Zephyr SDK. Without this the build stops looking for the SDK.
+      ZEPHYR_TOOLCHAIN_VARIANT: host
+    strategy:
+      fail-fast: false
+      matrix:
+        # This list is the variant model. Nothing in the source tree carries it:
+        # Zephyr only ever sees the FILE_SUFFIX passed on the command line, so
+        # adding a variant means editing a prj_*.conf and this matrix.
+        variant:
+          - "disco"
+          - "sleep"
+          - "spa"
+
+    steps:
+      - name: Checkout code
+        # Checked out into a subdirectory so the west workspace root is its parent.
+        uses: actions/checkout@v5
+        with:
+          path: spledz
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.11
+
+      - name: Install pypeline runner
+        run: pip install pypeline-runner
+        shell: bash
+
+      - name: Install tools
+        run: pypeline run
+        working-directory: spledz
+        shell: bash
+
+      - name: Initialise west workspace
+        run: |
+          source .venv/bin/activate
+          west init -l .
+          west update
+        working-directory: spledz
+        shell: bash
+
+      - name: Build ${{ matrix.variant }}
+        run: |
+          source .venv/bin/activate
+          source build/install/env_setup.sh
+          west build -b native_sim/native/64 -d build/${{ matrix.variant }} app \
+            -- -DFILE_SUFFIX=${{ matrix.variant }}
+        working-directory: spledz
+        shell: bash
+
+      - name: Smoke test ${{ matrix.variant }}
+        # The application never returns, so being alive after 2s (exit 124) is
+        # the pass condition.
+        run: |
+          timeout 2 ./build/${{ matrix.variant }}/zephyr/zephyr.exe || [ $? -eq 124 ]
+        working-directory: spledz
+        shell: bash

@@ -1,0 +1,5 @@
+# The SPLed feature model, reused as-is from the SPLed repository.
+# SPLED_ROOT is exported by CMakeLists.txt before find_package(Zephyr).
+source "$(SPLED_ROOT)/KConfig"
+
+source "Kconfig.zephyr"

@@ -1,0 +1,25 @@
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+    - name: cuinixam
+      url-base: https://github.com/cuinixam
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.0
+      # Without this, `west build` does not exist: west learns Zephyr's extension
+      # commands from this file. The official manifests get it through `import`,
+      # which also pulls every module. No modules are imported here because
+      # native_sim needs no vendor HAL. Adding a real board means adding the
+      # module it needs under a name-allowlist import.
+      west-commands: scripts/west-commands.yml
+
+    - name: SPLed
+      remote: cuinixam
+      path: spled
+      revision: e2f5dfd07187d340f586ed96f18b45225ff832e2
+
+  self:
+    path: spledz

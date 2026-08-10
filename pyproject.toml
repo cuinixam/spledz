@@ -1,0 +1,18 @@
+[project]
+name = "spledz"
+version = "0.0.1"
+description = "SPLed built with Zephyr"
+requires-python = "<4.0,>=3.11"
+
+dependencies = [
+    "west>=1.2,<2",
+    # Zephyr build-time Python dependencies. The authoritative list is
+    # zephyr/scripts/requirements-base.txt, available after `west update`.
+    "pyelftools>=0.29",
+    "PyYAML>=6.0",
+    "pykwalify>=1.8",
+    "packaging>=23.0",
+]
+
+[tool.poetry]
+package-mode = false
