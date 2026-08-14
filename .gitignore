@@ -1,3 +1,9 @@
 build/
 .venv/
 __pycache__/
+.bootstrap/
+
+# west workspace: this repository is the workspace root, so the projects it
+# manages are checked out here.
+.west/
+deps/

@@ -3,16 +3,36 @@ pipeline:
     - step: CreateVEnv
       module: pypeline.steps.create_venv
       config:
-        python_version: "3.11"
+        python_version: "3.13"
         python_package_manager: poetry>=2.2
     # Installs the tools listed in poks.json (cmake, ninja, gcc).
     - step: PoksInstall
       module: pypeline.steps.poks_install
-    # Writes the script that puts those tools on PATH.
+    # Publishes ZEPHYR_BASE and the toolchain variant. Must come before the env
+    # setup script, which bakes the execution context's variables into it.
+    - step: ZephyrSetup
+      file: steps/zephyr_setup.py
+    # Writes the script that puts those tools on PATH and exports the variables.
     - step: GenerateEnvSetupScript
       module: pypeline.steps.env_setup_script
 
-# Note: pypeline also ships a WestInstall step, which would create its own west
-# workspace from a west.yaml. It is deliberately not used here. The west.yml in
-# this repo is a native Zephyr manifest and the workspace is created with
-# `west init`, so the build stays the one a Zephyr team would run.
+    # Creates the west workspace with this repository as its root, then clones
+    # zephyr and spled into it. `west init -l` cannot produce this layout (it puts
+    # `.west` one level up), so the workspace is configured directly.
+    #
+    # Plain commands are enough because a run step inherits the execution context:
+    # the steps above have already put the venv and the poks tools on PATH, so
+    # `west` resolves without activating anything, and the commands run from the
+    # project root, which is where `.west` belongs. The step is always executed,
+    # which is what a sync command wants.
+    #
+    # Note: pypeline also ships a WestInstall step. It is not used because it
+    # re-generates the manifest from its own schema, which has no `west-commands`
+    # field -- and without that key `west build` does not exist. It would earn its
+    # place here if a later step needed to be told where the projects landed.
+    - step: SetupWestWorkspace
+      run: |
+        mkdir -p .west
+        west config --local manifest.path .
+        west config --local manifest.file west.yml
+        west update

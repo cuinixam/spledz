@@ -1,8 +1,9 @@
 {
   "name": "SPLed on Zephyr",
   "image": "mcr.microsoft.com/devcontainers/base:debian",
+  // Zephyr's variables are not set here: the ZephyrSetup pipeline step owns them
+  // and they arrive by sourcing build/install/env_setup.sh.
   "containerEnv": {
-    "ZEPHYR_TOOLCHAIN_VARIANT": "host",
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8"
   },

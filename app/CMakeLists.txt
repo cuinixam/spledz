@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20.0)
 # SPLed is a plain west project. It knows nothing about Zephyr, so nothing in
 # this port is mirrored on the SPLed side.
 if(NOT DEFINED SPLED_ROOT)
-  get_filename_component(SPLED_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../spled ABSOLUTE)
+  get_filename_component(SPLED_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../deps/spled ABSOLUTE)
 endif()
 if(NOT EXISTS ${SPLED_ROOT}/KConfig)
   message(FATAL_ERROR

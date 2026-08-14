@@ -9,6 +9,12 @@ manifest:
     - name: zephyr
       remote: zephyrproject-rtos
       revision: v4.4.0
+      # Not `zephyr/`: this repository is the workspace root and is therefore a
+      # west project itself, and Zephyr registers any project holding
+      # `zephyr/CMakeLists.txt` + `zephyr/Kconfig` as a module. A checkout at the
+      # root would make this repo look like a module wrapping Zephyr, and Kconfig
+      # would recurse into `Kconfig.zephyr`.
+      path: deps/zephyr
       # Without this, `west build` does not exist: west learns Zephyr's extension
       # commands from this file. The official manifests get it through `import`,
       # which also pulls every module. No modules are imported here because
@@ -18,8 +24,12 @@ manifest:
 
     - name: SPLed
       remote: cuinixam
-      path: spled
+      path: deps/spled
       revision: e2f5dfd07187d340f586ed96f18b45225ff832e2
 
+  # `.` makes this repository the workspace root, so `west update` clones zephyr
+  # and spled into it instead of beside it. `west init -l` cannot produce this
+  # layout, because it always puts `.west` next to the manifest repo. The
+  # workspace is configured directly instead (see README).
   self:
-    path: spledz
+    path: .

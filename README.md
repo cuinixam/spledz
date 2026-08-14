@@ -25,9 +25,9 @@ In Zed, open this folder and accept the dev container prompt, or run
 npm install -g @devcontainers/cli
 ```
 
-Inside the container, the west workspace is created next to this repository at
-`/workspaces`, so `zephyr/` and `spled/` live in the container rather than on
-your host.
+The west workspace root is this repository itself, so everything west clones
+lands under the mounted folder and the container needs no writable directory
+above it.
 
 Without Zed, the same environment is one command:
 
@@ -43,7 +43,7 @@ does, so a fresh clone needs nothing preinstalled but Python.
 
 ```bash
 pipx install pypeline-runner
-pypeline run                     # venv + cmake, ninja, gcc from poks.json
+pypeline run                     # venv + cmake, ninja, gcc + the west workspace
 source .venv/bin/activate
 source build/install/env_setup.sh
 ```
@@ -54,24 +54,54 @@ the yanga port to keep the three legs comparable.
 
 ## Getting a workspace
 
+`pypeline run` already did this: the `SetupWestWorkspace` step creates the
+workspace and clones the projects. By hand it is:
+
 ```bash
-west init -l .                   # this repository is the manifest repo
-west update                      # clones zephyr and spled next to it
+mkdir -p .west
+west config --local manifest.path .   # this repository is the workspace root
+west config --local manifest.file west.yml
+west update                           # clones zephyr and spled into it
 ```
 
-That gives you:
+Either way you get:
 
 ```
-spledz-workspace/
-├── spledz/     this repository (manifest repo)
-├── spled/      the product line, unmodified
-└── zephyr/
+spledz/
+├── .west/           workspace marker and local config
+├── app/             the Zephyr application, all the glue there is
+└── deps/
+    ├── spled/       the product line, unmodified
+    └── zephyr/
 ```
+
+The checkouts sit under `deps/` rather than at the root because this repository is
+the workspace root and therefore a west project itself, and Zephyr treats any
+project containing `zephyr/CMakeLists.txt` plus `zephyr/Kconfig` as a module. A
+Zephyr checkout at the root would make this repository look like a module
+wrapping Zephyr, and the Kconfig parse would recurse.
+
+The price is that Zephyr can no longer find itself. Its in-tree package search
+looks for a directory named `zephyr` among the application's ancestors, which is
+the same path the module scan objects to, so `ZEPHYR_BASE` has to say where Zephyr
+is. The `ZephyrSetup` step (`steps/zephyr_setup.py`) sets it, along with the
+toolchain variant, and `pypeline run` writes both into
+`build/install/env_setup.sh`. Sourcing that script is all any environment needs,
+which is why neither the dev container nor the CI workflow declares them.
+
+Zephyr's two discovery rules both assume the workspace root is not your
+repository. One local step is what it costs to disagree with them.
+
+`west init -l .` is the usual command and it is deliberately not used here. It
+always creates `.west` *next to* the manifest repo, so the workspace root ends up
+outside this repository and takes `deps/` with it. Setting
+`manifest.path` directly keeps everything inside one directory, which is what a
+container mount, an `rm -rf`, and a `.gitignore` can all reason about. The cloned
+trees are ignored, so `git status` stays clean.
 
 ## Building the variants
 
 ```bash
-export ZEPHYR_TOOLCHAIN_VARIANT=host
 west build -b native_sim/native/64 -d build/disco app -- -DFILE_SUFFIX=disco
 west build -b native_sim/native/64 -d build/sleep app -- -DFILE_SUFFIX=sleep
 west build -b native_sim/native/64 -d build/spa   app -- -DFILE_SUFFIX=spa
@@ -79,8 +109,9 @@ west build -b native_sim/native/64 -d build/spa   app -- -DFILE_SUFFIX=spa
 ```
 
 `native_sim` on its own builds a 32-bit binary and then needs a 32-bit libc, so
-the `/native/64` board target is used instead. `ZEPHYR_TOOLCHAIN_VARIANT=host`
-tells Zephyr to use the host compiler rather than look for the Zephyr SDK.
+the `/native/64` board target is used instead. `ZEPHYR_TOOLCHAIN_VARIANT=host`,
+set by the `ZephyrSetup` step, tells Zephyr to use the host compiler rather than
+look for the Zephyr SDK.
 
 Each variant gets its own build directory. `-d` is needed because pypeline also
 writes under `build/`, and because a shared directory would reconfigure on every
