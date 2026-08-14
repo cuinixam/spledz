@@ -1,5 +1,11 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 
+/* The LED display gets its own pseudo terminal, leaving the console free for the
+ * shell. See app/src/led_adapter.c. */
+&uart1 {
+	status = "okay";
+};
+
 / {
 	buttons {
 		compatible = "gpio-keys";

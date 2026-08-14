@@ -24,6 +24,7 @@ target_sources(app PRIVATE
   src/main.c
   src/led_adapter.c
   src/button_adapter.c
+  src/buttons_shell.c
   ${SPLED_COMPONENTS}/rte/src/rte.c
   ${SPLED_COMPONENTS}/spled/src/spled.c
   ${SPLED_COMPONENTS}/power_button/src/power_button.c

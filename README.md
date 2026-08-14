@@ -39,7 +39,8 @@ podman run --rm -it -v "$PWD":/spledz mcr.microsoft.com/devcontainers/base:debia
 
 Zephyr expects cmake, ninja and a compiler to be on your PATH already. This
 repository installs them with pypeline and poks, the same way the yanga port
-does, so a fresh clone needs nothing preinstalled but Python.
+does, so a fresh clone needs only Python, the libc headers the compiler builds
+against, and `dtc` — which poks does not package yet.
 
 ```bash
 pipx install pypeline-runner
@@ -117,6 +118,61 @@ Each variant gets its own build directory. `-d` is needed because pypeline also
 writes under `build/`, and because a shared directory would reconfigure on every
 variant switch.
 
+## Driving it
+
+The application boots powered off, exactly like the other two ports. In SPLed's
+`pc_terminal` platform you press `P` to switch it on and the arrow keys to change
+the blink frequency or the brightness. There is no keyboard here: the buttons are
+devicetree `gpio-keys` on `native_sim`'s emulated GPIO, and nothing drives them.
+The shell takes that role:
+
+```
+uart:~$ spled power     # on, and again for off
+uart:~$ spled up        # faster blinking (Disco) or brighter (Sleep)
+uart:~$ spled down
+```
+
+Each command drives the emulated pin low for twenty task periods, because
+`powerButton()` debounces over ten. `pc_terminal` solves the same problem by
+holding a keypress for fifteen frames.
+
+`native_sim` normally gives the console UART its own pseudo terminal, which puts
+both the shell and the LED somewhere you are not looking. The variant configs set
+`CONFIG_UART_NATIVE_PTY_0_ON_STDINOUT=y` so it lands in the terminal that started
+the binary. Zephyr discourages that for heavy interactive shell use, since history
+search and autocomplete misbehave, but typing these three commands is fine. To get
+the full shell instead, drop the option and open the reported pseudo terminal in a
+second window with `picocom /dev/pts/N`.
+
+The LED gets a **second terminal**. On startup the binary prints something like:
+
+```
+uart connected to pseudotty: /dev/pts/3
+```
+
+Open it in a second terminal and you have the `pc_terminal` display, a block whose
+background is the RGB value, redrawn in place whenever the colour changes:
+
+```bash
+picocom /dev/pts/3        # the number changes every run; Ctrl-A Ctrl-X to quit
+```
+
+For Disco that is green alternating with black, which is the blink. The shell
+stays in the window you started the binary from.
+
+`picocom` (installed by the dev container) rather than `screen`: it relays the
+bytes untouched, so the 24-bit colour escape reaches the terminal. `screen`
+re-renders and quantises the colour away, leaving a grey block that never appears
+to change, and `cat` does not open a pseudo terminal slave reliably. The RGB
+values are printed next to the block as a fallback, so the state stays readable
+even where the colour is not.
+
+Two terminals rather than one because the console is shared here. `pc_terminal`
+owns its terminal and can redraw with a bare `\r`; on Zephyr the console belongs
+to the shell, and interleaving a repainting display with a line editor ruins
+both. Enabling the board's second UART (`app.overlay`) gives the display a screen
+of its own and the problem disappears.
+
 The build itself is plain west. Nothing from pypeline, poks or yanga takes part
 in it.
 
@@ -145,6 +201,11 @@ The parts that do not:
   component plus a per-platform adapter. Zephyr describes hardware in
   devicetree, so the adapters were rewritten against `gpio-leds` and
   `gpio-keys`. This is the only real rewrite in the port.
+- **The way a person drives it.** A platform is not only adapters. `pc_terminal`
+  is also a keyboard simulator with its own hardware-latching emulation and an
+  ANSI renderer, and none of that has a Zephyr equivalent. The renderer moved
+  over unchanged, but the input side had to be rebuilt as emulated GPIO behind a
+  shell command (`app/src/buttons_shell.c`).
 - **Compiler settings that came from the platform.** SPLed's toolchain files
   define `SPLE_TESTABLE_STATIC`. Zephyr has no platform layer to carry it, so
   the definition is repeated in `app/CMakeLists.txt`.

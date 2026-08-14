@@ -7,7 +7,12 @@
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8"
   },
-  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build gcc g++ python3 python3-venv device-tree-compiler pipx && pipx ensurepath && pipx install pypeline-runner",
+  // Only what poks cannot provide: Python for the pypeline bootstrap, the libc
+  // headers poks' gcc compiles against, dtc (not in poks.json), and picocom to
+  // read the LED display's pseudo terminal (it relays bytes untouched, so the
+  // 24-bit colour survives where screen quantises it away).
+  // cmake, ninja and gcc are deliberately absent: poks.json pins those.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libc6-dev device-tree-compiler picocom python3 python3-venv pipx && pipx ensurepath && pipx install pypeline-runner",
   "customizations": {
     "vscode": {
       "extensions": [
