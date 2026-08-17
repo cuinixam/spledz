@@ -54,9 +54,14 @@ pipeline:
     # Espressif ships the radio firmware as binary blobs kept out of git, and the
     # build needs them. Separate from the step above because it can only run once
     # hal_espressif is on disk, and because the download is the expensive part.
+    #
+    # The regex narrows 54 blobs to the 4 for this SoC. Without it every
+    # Espressif chip's radio libraries are downloaded, and a single failed
+    # transfer among them fails the whole command, for a file no build here
+    # would ever open. A second Espressif platform means a second alternative.
     - step: FetchEspressifBlobs
       run: |
-        west blobs fetch hal_espressif
+        west blobs fetch hal_espressif --allow-regex lib/esp32h2/
 
   build:
     # SPLed has a platform layer; Zephyr has boards, toolchains and devicetree

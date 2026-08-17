@@ -9,21 +9,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
-    name: Build ${{ matrix.variant }} (Linux)
+  build:
+    name: Build ${{ matrix.variant }} for ${{ matrix.platform }}
     runs-on: ubuntu-latest
-    # Zephyr's variables are not set here: the ZephyrSetup pipeline step owns them
-    # and the build step gets them from build/install/env_setup.sh.
+    # Zephyr's variables are not set here: the pipeline owns them. The build step
+    # passes the toolchain ones per build, and the rest arrive through
+    # build/install/env_setup.sh.
     strategy:
       fail-fast: false
       matrix:
-        # This list is the variant model. Nothing in the source tree carries it:
-        # Zephyr only ever sees the FILE_SUFFIX passed on the command line, so
-        # adding a variant means editing a prj_*.conf and this matrix.
+        # The product line as a matrix. The variants are the prj_*.conf files and
+        # nothing in the source tree enumerates them, so adding one means editing
+        # a config and this list. The platforms are declared once more, in the
+        # ZephyrBuild step of pypeline.yaml, which is where a platform is defined;
+        # this list only says which of them CI builds.
         variant:
           - "disco"
           - "sleep"
           - "spa"
+        platform:
+          - "sim"
+          - "esp32h2"
 
     steps:
       - name: Checkout code
@@ -38,21 +44,25 @@ jobs:
         run: pip install pypeline-runner
         shell: bash
 
-      - name: Install tools and create the west workspace
-        run: pypeline run
+      # One command: tools, west workspace, blobs, and the build itself. The
+      # pair is the whole interface, so CI runs what a developer runs.
+      - name: Build
+        run: pypeline run -i platform=${{ matrix.platform }} -i variant=${{ matrix.variant }}
         shell: bash
 
-      - name: Build ${{ matrix.variant }}
+      - name: Smoke test
+        # Only the simulator produces something this runner can execute. The
+        # application never returns, so being alive after 2s (exit 124) is the
+        # pass condition.
+        if: matrix.platform == 'sim'
         run: |
-          source .venv/bin/activate
-          source build/install/env_setup.sh
-          west build -b native_sim/native/64 -d build/${{ matrix.variant }} app \
-            -- -DFILE_SUFFIX=${{ matrix.variant }}
+          timeout 2 ./build/sim/${{ matrix.variant }}/zephyr/zephyr.exe || [ $? -eq 124 ]
         shell: bash
 
-      - name: Smoke test ${{ matrix.variant }}
-        # The application never returns, so being alive after 2s (exit 124) is
-        # the pass condition.
+      - name: Check the flashable image
+        # Nothing here can run a cross build, so the check is that the image the
+        # board would be flashed with exists and is not empty.
+        if: matrix.platform != 'sim'
         run: |
-          timeout 2 ./build/${{ matrix.variant }}/zephyr/zephyr.exe || [ $? -eq 124 ]
+          test -s build/${{ matrix.platform }}/${{ matrix.variant }}/zephyr/zephyr.bin
         shell: bash

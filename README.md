@@ -397,7 +397,12 @@ installed: the `riscv64-zephyr-elf` toolchain comes from poks like every other
 tool. 143 KB of flash and 66 KB of RAM for Disco. Not yet flashed to the board,
 so nothing here is confirmed to run.
 
-`native_sim` only runs on Linux, and only builds there — the POSIX architecture
+`native_sim` only runs on Linux, and only builds there. The POSIX architecture
 refuses to configure anywhere else. On Windows or macOS use a container or a VM
 for that platform; the hardware platform needs neither, which makes it the more
-portable of the two. The CI workflow covers Linux.
+portable of the two.
+
+CI builds the full matrix, three variants for both platforms, on Linux. The
+simulator jobs run the binary for two seconds to prove it boots; the hardware
+jobs check that a flashable image came out, because a runner cannot do more than
+that without a board attached.
