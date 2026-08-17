@@ -286,10 +286,32 @@ of its own and the problem disappears.
 
 ### On the board
 
-Everything above is the simulator. On the H2 the buttons are real, so
-`buttons_shell.c` is not built and there is no `spled` command. That means the
-buttons have to be wired or nothing happens at all: the application boots
-powered off, and the LED stays dark until the power button is pressed.
+Everything above is the simulator, and the same three commands work on the
+board. Wiring the buttons is optional, which matters because the application
+boots powered off: with nothing wired and no way in, the LED would just stay
+dark.
+
+```
+uart:~$ spled power     # over picocom, on the board
+uart:~$ spled state
+```
+
+Physical buttons and shell commands work at the same time, in any order. A press
+from the shell reconfigures the pin as an output and drives the pressed level,
+keeping the input enabled so the adapter still reads the pin; a release puts it
+back to a plain input and lets the pull-up win. Since the shell only ever drives
+the pin the same way a button does, holding a real button during a shell press
+pulls the line the same direction instead of fighting the driver. The adapter
+above cannot tell the two apart, and does not need to.
+
+This is the part of the port with no SPLed counterpart. `pc_terminal` has a
+keyboard simulator built into the platform; here the equivalent is a shell
+command that drives a GPIO, and how it drives it depends on whether the pin is
+emulated or real.
+
+**Untested on hardware.** The emulated path is exercised by the sim platform.
+The pin-driving path is read off the ESP32 GPIO driver, which enables the input
+buffer and the output driver independently, but nothing has been flashed yet.
 
 The pins are declared in `app/boards/esp32h2_devkitm.overlay`. They are active
 low with the internal pull-up enabled, so a button simply connects its pin to

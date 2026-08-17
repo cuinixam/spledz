@@ -33,11 +33,12 @@ target_sources(app PRIVATE
 
 # The platform adapters, picked by what the board's devicetree offers rather
 # than by the board name: an RGB LED on a data line goes through led_strip, a
-# plain on/off LED through gpio. Emulated buttons need something to press them,
-# real ones do not.
+# plain on/off LED through gpio.
 target_sources_ifdef(CONFIG_LED_STRIP app PRIVATE src/led_adapter_ws2812.c)
 target_sources_ifndef(CONFIG_LED_STRIP app PRIVATE src/led_adapter.c)
-target_sources_ifdef(CONFIG_GPIO_EMUL app PRIVATE src/buttons_shell.c)
+# Both platforms: on native_sim it is the only way to press a button, on the
+# board it is the one that needs no wiring.
+target_sources_ifdef(CONFIG_SHELL app PRIVATE src/buttons_shell.c)
 
 # In SPLed each variant lists the components it is built from. Zephyr has no
 # variant to carry that list, so the selection is re-derived from a feature
