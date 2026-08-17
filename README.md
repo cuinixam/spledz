@@ -14,8 +14,15 @@ project. Everything here is the cost of putting that product line on Zephyr.
 
 ## Working in the dev container
 
-`native_sim` only builds on Linux, so on macOS and Windows the work happens in a
-container. `.devcontainer/devcontainer.json` has the toolchain already.
+`native_sim` only builds on Linux, so on macOS and Windows the `sim` platform
+needs a container or a Linux VM. `.devcontainer/devcontainer.json` has the
+toolchain already. A plain Ubuntu machine or VM works just as well and needs one
+apt line, see "Installing the tools" below. The `esp32h2` platform needs neither:
+it cross-compiles anywhere, macOS included, and flashing is a USB cable.
+
+Do not use the container and the host on the same clone at the same time. They
+share `.venv` through the mount, and whichever one ran `pypeline run` last owns
+it, since the binaries in it are platform specific.
 
 In Zed, open this folder and accept the dev container prompt, or run
 `project: open remote` from the command palette. Zed drives the official
@@ -49,6 +56,18 @@ pypeline run                     # venv + tools + west workspace, then builds th
 source .venv/bin/activate
 source build/install/env_setup.sh
 ```
+
+On a plain Ubuntu machine, with no container involved, the prerequisites are one
+apt line:
+
+```bash
+sudo apt-get install -y git python3 python3-venv pipx libc6-dev picocom
+pipx ensurepath                  # then open a new shell
+```
+
+`libc6-dev` is what the host compiler links against for the `sim` platform, and
+`picocom` reads the board's serial console. Nothing else is needed. cmake,
+ninja, gcc and the RISC-V toolchain all arrive with `pypeline run`.
 
 `pypeline run` ends with a build, so on macOS give it a platform that builds
 there — `pypeline run -i platform=esp32h2` — or stop after provisioning with
@@ -177,6 +196,38 @@ The file names are the board target with `/` replaced by `_`. The short form
 full qualifiers and the H2 files do not. A name that matches nothing is not an
 error; it is simply never applied, which is a quiet way to lose an overlay.
 
+## Flashing the board
+
+Not done yet. The commands below come from the board's runner configuration and
+from the vendor schematic, not from a board on a desk, so treat them as the
+starting point rather than as a tested recipe.
+
+```bash
+source .venv/bin/activate             # west and esptool live here
+source build/install/env_setup.sh
+west flash -d build/esp32h2/disco
+picocom /dev/ttyUSB0 -b 115200        # Ctrl-A Ctrl-X to quit
+```
+
+`west flash` uses the `esp32` runner, which is esptool underneath. esptool is
+already in the venv, because the Espressif SoC CMake wants it at configure time
+too. The runner picks the port itself, or takes `--esp-device /dev/ttyUSB0`, or
+reads `ESPTOOL_PORT` from the environment. It flashes at 921600 baud and the
+console runs at 115200.
+
+Three things about this board in particular:
+
+- **The port is a USB-UART bridge, not the SoC's own USB.** The board DTS puts
+  console and shell on `uart0`, which is wired to the CH343 bridge, so the
+  device is `/dev/ttyUSB0` rather than `/dev/ttyACM0`. The SoC also exposes a
+  native USB serial peripheral on the same cable, but nothing routes the console
+  there yet.
+- **No button press to flash.** The board drives BOOT and reset from DTR and RTS,
+  so esptool puts it into download mode on its own.
+- **Serial access needs the `dialout` group.** `sudo usermod -aG dialout $USER`,
+  then log out and back in. In a Parallels VM the device also has to be handed to
+  the guest first, under Devices, USB & Bluetooth.
+
 ## Driving it
 
 The application boots powered off, exactly like the other two ports. In SPLed's
@@ -233,8 +284,31 @@ both. Enabling the board's second UART (`app/boards/native_sim_native_64.overlay
 gives the display a screen
 of its own and the problem disappears.
 
-The build itself is plain west. Nothing from pypeline, poks or yanga takes part
-in it.
+### On the board
+
+Everything above is the simulator. On the H2 the buttons are real, so
+`buttons_shell.c` is not built and there is no `spled` command. That means the
+buttons have to be wired or nothing happens at all: the application boots
+powered off, and the LED stays dark until the power button is pressed.
+
+The pins are declared in `app/boards/esp32h2_devkitm.overlay`. They are active
+low with the internal pull-up enabled, so a button simply connects its pin to
+ground:
+
+| Button | Pin |
+| --- | --- |
+| Power | GPIO10 |
+| Up | GPIO11 |
+| Down | GPIO12 |
+
+BOOT on GPIO9 is left alone, since the flashing circuit uses it. The LED needs
+no wiring: it is the onboard WS2812 on GPIO8 and it takes the RGB value
+directly, so the colour block the simulator has to draw as text has no
+counterpart here. The Zephyr shell still sits on the console for logs.
+
+The compile itself is plain west, and nothing from poks or yanga takes part in
+it. pypeline only chooses the variant and the platform and passes the toolchain
+flags that go with them, which you can type yourself instead.
 
 ## What the port costs
 
