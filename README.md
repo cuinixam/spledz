@@ -198,30 +198,43 @@ error; it is simply never applied, which is a quiet way to lose an overlay.
 
 ## Flashing the board
 
-Not done yet. The commands below come from the board's runner configuration and
-from the vendor schematic, not from a board on a desk, so treat them as the
-starting point rather than as a tested recipe.
+Tested on 2026-08-17, on an Ubuntu VM under Parallels with the board handed to
+the guest.
 
 ```bash
 source .venv/bin/activate             # west and esptool live here
 source build/install/env_setup.sh
 west flash -d build/esp32h2/disco
-picocom /dev/ttyUSB0 -b 115200        # Ctrl-A Ctrl-X to quit
+picocom /dev/ttyACM1 -b 115200        # Ctrl-A Ctrl-X to quit
 ```
 
 `west flash` uses the `esp32` runner, which is esptool underneath. esptool is
 already in the venv, because the Espressif SoC CMake wants it at configure time
-too. The runner picks the port itself, or takes `--esp-device /dev/ttyUSB0`, or
-reads `ESPTOOL_PORT` from the environment. It flashes at 921600 baud and the
-console runs at 115200.
+too. The runner picks the port itself, or takes `--esp-device`, or reads
+`ESPTOOL_PORT` from the environment. It flashes at 921600 baud and the console
+runs at 115200.
 
 Three things about this board in particular:
 
-- **The port is a USB-UART bridge, not the SoC's own USB.** The board DTS puts
-  console and shell on `uart0`, which is wired to the CH343 bridge, so the
-  device is `/dev/ttyUSB0` rather than `/dev/ttyACM0`. The SoC also exposes a
-  native USB serial peripheral on the same cable, but nothing routes the console
-  there yet.
+- **Both USB paths are CDC-ACM on Linux, so the device name tells you nothing.**
+  There is one Type-C socket with a hub behind it, and two devices enumerate:
+  the SoC's own USB-Serial-JTAG unit and the CH343 bridge wired to `uart0`. The
+  CH343 needs no `ch341` driver and never creates a `/dev/ttyUSB*`; it comes up
+  as a second `/dev/ttyACM*`. Tell them apart by USB vendor ID rather than by
+  name or by order:
+
+  ```bash
+  for d in /dev/ttyACM*; do
+    echo "== $d"
+    udevadm info -q property -n "$d" | grep -E 'ID_VENDOR_ID|ID_MODEL='
+  done
+  ```
+
+  `1a86` is the bridge and carries the console, because the board DTS puts
+  console and shell on `uart0`. `303a` is the SoC's own USB, which nothing is
+  routed to. Connecting to the wrong one gives a terminal that opens fine, echoes
+  nothing and never prints, which looks like a dead board rather than a wrong
+  device.
 - **No button press to flash.** The board drives BOOT and reset from DTR and RTS,
   so esptool puts it into download mode on its own.
 - **Serial access needs the `dialout` group.** `sudo usermod -aG dialout $USER`,
@@ -309,9 +322,11 @@ keyboard simulator built into the platform; here the equivalent is a shell
 command that drives a GPIO, and how it drives it depends on whether the pin is
 emulated or real.
 
-**Untested on hardware.** The emulated path is exercised by the sim platform.
-The pin-driving path is read off the ESP32 GPIO driver, which enables the input
-buffer and the output driver independently, but nothing has been flashed yet.
+The pin-driving path is tested: on 2026-08-17 the Disco build ran on the board
+and all four commands worked over the console, with the onboard WS2812 blinking
+green and `spled up` and `spled down` changing the rate. Physical buttons are
+still untested, because nothing is wired to GPIO10, GPIO11 and GPIO12 yet, and
+the shell is enough to drive the demo without them.
 
 The pins are declared in `app/boards/esp32h2_devkitm.overlay`. They are active
 low with the internal pull-up enabled, so a button simply connects its pin to
@@ -394,8 +409,10 @@ Disco, which is the conditional `brightness_controller` doing its job.
 
 **`esp32h2`** — all three variants build and link, on macOS, with no Zephyr SDK
 installed: the `riscv64-zephyr-elf` toolchain comes from poks like every other
-tool. 143 KB of flash and 66 KB of RAM for Disco. Not yet flashed to the board,
-so nothing here is confirmed to run.
+tool. 143 KB of flash and 66 KB of RAM for Disco. Disco is flashed and running
+on the board as of 2026-08-17: the onboard WS2812 blinks, and `spled power`,
+`up`, `down` and `state` all work over the console. Sleep and Spa build but have
+not been flashed, and no physical buttons are wired.
 
 `native_sim` only runs on Linux, and only builds there. The POSIX architecture
 refuses to configure anywhere else. On Windows or macOS use a container or a VM
