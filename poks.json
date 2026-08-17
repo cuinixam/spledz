@@ -20,6 +20,11 @@
             "name": "gcc",
             "version": "15.2.0-1",
             "bucket": "poks-bucket"
+        },
+        {
+            "name": "riscv64-zephyr-elf",
+            "version": "0.17.4",
+            "bucket": "poks-bucket"
         }
     ]
 }

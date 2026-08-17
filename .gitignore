@@ -7,3 +7,5 @@ __pycache__/
 # manages are checked out here.
 .west/
 deps/
+# Modules imported from Zephyr's manifest keep the path upstream gives them.
+modules/

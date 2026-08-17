@@ -13,6 +13,14 @@ dependencies = [
     "pykwalify>=1.8",
     "jsonschema>=4.0",
     "packaging>=23.0",
+    # `west blobs fetch` needs it: its https fetcher is a plugin that fails to
+    # import without this, and the failure surfaces as "unknown fetcher".
+    "requests>=2.32.4",
+    # Modules bring their own Python dependencies, declared in their module.yml
+    # and installed by `west packages pip --install`, which poetry does not see.
+    # This one is hal_espressif's (zephyr/requirements.txt): the espressif SoC
+    # CMake looks for it in PATH at configure time, not only when flashing.
+    "esptool>=5.2.0",
 ]
 
 [tool.poetry]

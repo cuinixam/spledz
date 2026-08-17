@@ -17,10 +17,18 @@ manifest:
       path: deps/zephyr
       # Without this, `west build` does not exist: west learns Zephyr's extension
       # commands from this file. The official manifests get it through `import`,
-      # which also pulls every module. No modules are imported here because
-      # native_sim needs no vendor HAL. Adding a real board means adding the
-      # module it needs under a name-allowlist import.
+      # which also pulls every module. The import below is name-filtered instead,
+      # so only the modules a board here actually needs come along.
       west-commands: scripts/west-commands.yml
+      # native_sim needs no vendor HAL; the ESP32-H2 board needs Espressif's, and
+      # it is declared in Zephyr's own manifest. It keeps the path upstream gives
+      # it, `modules/hal/espressif`, so this workspace looks like every other
+      # Zephyr one. Do not add `path-prefix` here to move it under `deps/`: west
+      # applies an import's prefix to the importing project as well, which would
+      # silently relocate the Zephyr checkout above.
+      import:
+        name-allowlist:
+          - hal_espressif
 
     - name: SPLed
       remote: cuinixam

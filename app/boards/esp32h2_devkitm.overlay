@@ -1,0 +1,74 @@
+/*
+ * The WS2812 half is taken from Zephyr's own led_strip sample
+ * (samples/drivers/led/led_strip/boards/esp32h2_devkitm.overlay), which already
+ * describes the onboard RGB LED: a WS2812 on GPIO8 driven over I2S with DMA,
+ * because there is no RMT-based WS2812 driver in the tree. The Waveshare board
+ * carries the same LED on the same pin, so the node transfers unchanged.
+ *
+ * The buttons are ours: the board has one usable key (BOOT, GPIO9) and SPLed
+ * needs three, so they are wired to free header pins.
+ */
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/led/led.h>
+
+/ {
+	aliases {
+		led-strip = &led_strip;
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		power_button: button_power {
+			gpios = <&gpio0 10 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Power button";
+		};
+
+		up_button: button_up {
+			gpios = <&gpio0 11 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Up button";
+		};
+
+		down_button: button_down {
+			gpios = <&gpio0 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "Down button";
+		};
+	};
+};
+
+/* Not in the aliases block above: the board DTS already aliases sw0 to the BOOT
+ * key, and an alias can only be set once, so all three are overridden here. */
+&{/aliases} {
+	sw0 = &power_button;
+	sw1 = &up_button;
+	sw2 = &down_button;
+};
+
+&i2s_default {
+	group1 {
+		pinmux = <I2S_O_SD_GPIO8>;
+	};
+};
+
+i2s_led: &i2s {
+	status = "okay";
+
+	dmas = <&dma 3>;
+	dma-names = "tx";
+
+	led_strip: ws2812@0 {
+		compatible = "worldsemi,ws2812-i2s";
+
+		reg = <0>;
+		chain-length = <1>;
+		color-mapping = <LED_COLOR_ID_GREEN
+				 LED_COLOR_ID_RED
+				 LED_COLOR_ID_BLUE>;
+		reset-delay = <500>;
+	};
+};
+
+&dma {
+	status = "okay";
+};

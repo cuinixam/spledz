@@ -1,3 +1,15 @@
+# The two axes of the product line. Everything else -- board, toolchain,
+# overlay, Kconfig fragments -- follows from the pair.
+inputs:
+  variant:
+    type: string
+    description: Which product to build (prj_<variant>.conf).
+    default: disco
+  platform:
+    type: string
+    description: What to build it for (see the platforms below).
+    default: sim
+
 pipeline:
   install:
     - step: CreateVEnv
@@ -5,7 +17,8 @@ pipeline:
       config:
         python_version: "3.13"
         python_package_manager: poetry>=2.2
-    # Installs the tools listed in poks.json (cmake, ninja, gcc).
+    # Installs the tools listed in poks.json (cmake, ninja, gcc, and the RISC-V
+    # cross toolchain the ESP32-H2 build needs).
     - step: PoksInstall
       module: pypeline.steps.poks_install
     # Publishes ZEPHYR_BASE and the toolchain variant. Must come before the env
@@ -17,7 +30,8 @@ pipeline:
       module: pypeline.steps.env_setup_script
 
     # Creates the west workspace with this repository as its root, then clones
-    # zephyr and spled into it. `west init -l` cannot produce this layout (it puts
+    # zephyr, spled and the Espressif HAL into it. `west init -l` cannot produce
+    # this layout (it puts
     # `.west` one level up), so the workspace is configured directly.
     #
     # Plain commands are enough because a run step inherits the execution context:
@@ -36,3 +50,35 @@ pipeline:
         west config --local manifest.path .
         west config --local manifest.file west.yml
         west update
+
+    # Espressif ships the radio firmware as binary blobs kept out of git, and the
+    # build needs them. Separate from the step above because it can only run once
+    # hal_espressif is on disk, and because the download is the expensive part.
+    - step: FetchEspressifBlobs
+      run: |
+        west blobs fetch hal_espressif
+
+  build:
+    # SPLed has a platform layer; Zephyr has boards, toolchains and devicetree
+    # overlays with nothing tying them together. This table is where that layer
+    # went. A platform is 1:1 with a board, so naming the board here is enough
+    # to select the overlay and the Kconfig fragments as well -- Zephyr looks
+    # those up under app/boards/ by board name.
+    - step: ZephyrBuild
+      file: steps/zephyr_build.py
+      config:
+        platforms:
+          sim:
+            board: native_sim/native/64
+            # Builds with the host compiler; no cross toolchain involved.
+            toolchain: host
+          esp32h2:
+            board: esp32h2_devkitm/esp32h2
+            toolchain: cross-compile
+            # The poks app providing it. Its name is also the compiler prefix.
+            toolchain_app: riscv64-zephyr-elf
+            # Zephyr's sysroot detection composes a doubled path when a
+            # toolchain ships more than one libc (cross-compile/target.cmake,
+            # lines 42 and 52), and this one ships picolibc and newlib. Naming
+            # the sysroot skips that code entirely. Relative to the toolchain.
+            sysroot: picolibc/riscv64-zephyr-elf

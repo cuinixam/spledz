@@ -8,7 +8,8 @@
 
 /* Nothing drives the emulated button pins on native_sim, so this is the port's
  * replacement for SPLed's pc_terminal keyboard: `spled power`, `spled up`,
- * `spled down`. The pins are the ones app.overlay declares. */
+ * `spled down`. The pins are the ones boards/native_sim_native_64.overlay
+ * declares. On real hardware the buttons are real, so this file is not built. */
 
 /* powerButton() needs POWER_BUTTON_PRESS_DEBOUNCE (10) consecutive polls at
  * CONFIG_OS_TASK_PERIOD ms to accept a press; hold well past that. */
